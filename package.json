@@ -13,6 +13,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "build:analyze": "ANALYZE=true vite build",
+    "check:budgets": "node scripts/bundle-budgets/cli.mjs",
     "size-limit": "size-limit",
     "preview": "vite preview",
     "prepare": "husky || true",
@@ -24,21 +25,25 @@
   },
   "size-limit": [
     {
-      "name": "Main JS (entry)",
+      "name": "Initial JS (entry chunk)",
       "path": "dist/assets/index-*.js",
-      "limit": "200 kB",
+      "limit": "12 kB",
       "brotli": true
     },
     {
-      "name": "Total JS (all chunks)",
-      "path": "dist/assets/*.js",
-      "limit": "600 kB",
+      "name": "Initial JS (entry + always-loaded vendors)",
+      "path": [
+        "dist/assets/index-*.js",
+        "dist/assets/vendor-react-*.js",
+        "dist/assets/vendor-router-*.js"
+      ],
+      "limit": "78 kB",
       "brotli": true
     },
     {
-      "name": "CSS Bundle",
+      "name": "Initial CSS",
       "path": "dist/assets/index-*.css",
-      "limit": "50 kB",
+      "limit": "6 kB",
       "brotli": true
     }
   ],

@@ -51,16 +51,33 @@ Copy `.env.example` to `.env` to override defaults:
 ```bash
 npm run build          # outputs to dist/
 npm run build:analyze  # build + generate bundle analysis report (reports/bundle-stats.html)
-npm run size-limit     # check bundle size against configured budgets
+npm run check:budgets  # structural bundle budget guard (run after build)
+npm run size-limit     # size-limit backstop over the initial-load set
 npm run preview        # preview production build locally
 ```
 
 ### Bundle Size Budgets
 
-| Asset | Limit | Status |
-|---|---|---|
-| JavaScript | 200 kB | Enforced in CI |
-| CSS | 50 kB | Enforced in CI |
+Budgets live in [budgets.config.json](./budgets.config.json) — the single source of truth — and are enforced in CI by `npm run check:budgets` (scripts/bundle-budgets), with `npm run size-limit` as a redundant backstop over the same initial-load set. All sizes are brotli.
+
+The guard is structural, not just a global number:
+
+- **Coverage** — every emitted JS/CSS file must be classified (initial, vendor, or a declared lazy route). An unclaimed chunk fails the build instead of silently escaping the budgets.
+- **Initial-load boundary** — the initial download is the entry chunk plus statically reachable vendor chunks only. The set of lazy-loaded route entries is pinned by an explicit allowlist, so moving code into a `lazy()` chunk that still loads on every visit is a reviewable config diff, not a way around the budget.
+- **Vendor attribution** — each named vendor chunk has its own size budget and an exact allowlist of npm packages, verified against the build's chunk→module map (`dist/.vite/chunk-modules.json`, emitted by a small Vite plugin). Vendoring a heavy dependency into the "react" chunk fails with the package named.
+- **Lazy-route budgets** — each lazy route's own chunk and its non-initial subtree are budgeted, so deferring code cannot just relocate the weight.
+
+| Budget | Limit |
+|---|---|
+| Initial JS — entry chunk | 12 kB |
+| Initial JS — entry + always-loaded vendors | 78 kB |
+| Initial CSS | 6 kB |
+| `vendor-react` | 55 kB |
+| `vendor-router` | 13 kB |
+| `vendor-charts` (lazy, `mustBeLazy`) | 90 kB |
+| PriceDetail lazy route (chunk / subtree) | 4 kB / 95 kB |
+
+Adding a dependency: bundle it, run `npm run check:budgets`, and add the package to the correct vendor chunk's `packages` allowlist (or create a new vendor chunk) in `budgets.config.json` — the failure message names the exact spot.
 
 The CI pipeline generates a [bundle-stats.html](./reports/bundle-stats.html) report using `rollup-plugin-visualizer` — an interactive treemap of the production bundle. This report is uploaded as a CI artifact on every build.
 
